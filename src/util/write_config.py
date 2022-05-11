@@ -16,7 +16,7 @@
 # along with Brightness Controller.  If not, see <http://www.gnu.org/licenses/>.
 
 import configparser
-
+import qtpy.QtGui
 
 def default_config(config, display_type = 'primary'):
     config[display_type]['brightness'] = 99
@@ -78,6 +78,11 @@ def write_both_display(p_br_rgb, s_br_rgb, file_path):
         default_config(config, 'secondary')
     else:
         set_value_in_config(config, s_br_rgb, 'secondary')
-
-    with open(file_path, 'w+') as configfile:
-        config.write(configfile)
+    try:
+        with open(file_path, 'w+') as configfile:
+            config.write(configfile)
+    except PermissionError as p:
+        result = QtGui.QMessageBox.critical(None, 'Error!',
+                                            "Permission error: Can not save at {}".format(
+                                                file_path),
+                                            QtGui.QMessageBox.Abort)
