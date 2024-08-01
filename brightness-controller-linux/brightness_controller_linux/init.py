@@ -18,7 +18,7 @@
 # <http://www.gnu.org/licenses/>.
 
 import sys
-import getpass
+import getpass, argparse
 from os import path, remove, makedirs
 from qtpy import QtGui, QtCore, QtWidgets
 from qtpy.QtCore import QSize, Qt
@@ -38,6 +38,8 @@ import subprocess
 import threading
 
 
+verbosity = 1
+
 class MyApplication(QtWidgets.QMainWindow):
     ddcutil_Installed = False
 
@@ -46,11 +48,19 @@ class MyApplication(QtWidgets.QMainWindow):
     # ["connection", "name"] ordered the same as ddcutil lists
     ddcDisplays = []
 
+    global parser
+
+    def verbose(self, verbosityLevel : int, message: str) -> None:
+        if verbosityLevel >= verbosity:
+            print(message)
+
     def __assign_displays(self):
         """assigns display name """
         self.displays = CDisplay.extract_display_names() # returns ['connection', 'name']
         self.no_of_displays = len(self.displays)
         self.no_of_connected_dev = self.no_of_displays
+
+        self.verbose(2, str(self.displays) + "   " + str(self.no_of_displays))
 
         if self.no_of_displays == 1:
             self.display1 = self.displays[0][0]
@@ -143,9 +153,6 @@ class MyApplication(QtWidgets.QMainWindow):
                     self.displayMaxes.append(1)
                     self.displayValues.append(1)
 
-
-        
-        if self.ddcutil_Installed:
             res = all(ele == "Invalid display" for ele in self.displays)
             if not res:
                 self.ui.directControlBox.setEnabled(True)
@@ -863,6 +870,16 @@ class HelpForm(QtWidgets.QWidget):
     def set_main_window(self, main_win):
         """assigns main_win as main_window"""
         self.main_window = main_win
+
+
+parser = argparse.ArgumentParser(prog='ProgramName',
+                    description='What the program does',
+                    epilog='use --help to show cli arguments')
+parser.add_argument('-v', '--verbose', action='store_const', const=2, default=1)
+
+args = parser.parse_args()
+verbosity = args.verbose
+
 
 def main():
     UUID = 'PHIR-HWOH-MEIZ-AHTA'
