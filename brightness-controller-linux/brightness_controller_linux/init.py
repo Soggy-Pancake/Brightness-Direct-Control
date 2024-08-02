@@ -368,6 +368,8 @@ class MyApplication(QtWidgets.QMainWindow):
                     self.ui.secondary_brightness.setEnabled(False)
 
         else:
+            self.ui.primary_brightness.setEnabled(True)
+            self.ui.primary_brightness.setEnabled(True)
             self.ui.primary_brightness.setMaximum(99)
             self.ui.secondary_brightness.setMaximum(99)
             self.ui.primary_brightness.setValue(99)
@@ -556,7 +558,7 @@ class MyApplication(QtWidgets.QMainWindow):
         """
         self.display2 = self.displays[
             self.ui.secondary_combo.currentIndex()][0]  # text
-            
+
         if self.ui.directControlBox.isChecked():
             self.directControlUpdate(0)
 
