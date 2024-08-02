@@ -93,6 +93,7 @@ def extract_display_names():
         if monitorName:
             monitorInfo.append(extract_monitor_name(currentEdid))
         else:
+            print(f"Failed to get display name from monitor {monitor[0]}")
             monitorInfo.append(monitorInfo[0])
 
         displays.append(monitorInfo)

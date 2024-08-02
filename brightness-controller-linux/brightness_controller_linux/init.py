@@ -46,7 +46,6 @@ class MyApplication(QtWidgets.QMainWindow):
     displayMaxes = []
     displayValues = []
     # ["connection", "name"] ordered the same as ddcutil lists
-    ddcDisplays = []
 
     global parser
 
@@ -56,7 +55,7 @@ class MyApplication(QtWidgets.QMainWindow):
 
     def __assign_displays(self):
         """assigns display name """
-        self.displays = CDisplay.extract_display_names() # returns ['connection', 'name']
+        self.displays = CDisplay.extract_display_names() # returns ['connection', 'display name']
         self.no_of_displays = len(self.displays)
         self.no_of_connected_dev = self.no_of_displays
 
@@ -68,7 +67,8 @@ class MyApplication(QtWidgets.QMainWindow):
             self.display1 = self.displays[0][0]
             self.display2 = self.displays[1][0]
 
-    def directlySetMaxBrightness(self, displayNum, percentage):
+    def directlySetBrightness(self, displayNum, percentage):
+        self.verbose(2, f"Updating brightness for display {self.displays[displayNum][1]}")
 
         percentage = round(percentage) / 100
 
@@ -140,7 +140,7 @@ class MyApplication(QtWidgets.QMainWindow):
             self.displays = CDisplay.match_ddc_order(self.displays)
         
             for i in range(len(self.displays)):
-                if not self.displays[i] == "Invalid display":
+                if not self.displays[i][0].startswith("eDP"):
                     brightnessValue = str(subprocess.check_output(
                         ["ddcutil", "getvcp", "10", "-d", str(i + 1)]), 'utf-8')
 
@@ -150,16 +150,20 @@ class MyApplication(QtWidgets.QMainWindow):
                     self.displayValues.append(int(
                         brightnessValue.split(',')[0].split('=')[1].strip()))
                 else:
-                    self.displayMaxes.append(1)
-                    self.displayValues.append(1)
+                    if not len(self.displays) > 1:
+                        self.ui.directControlBox.setEnabled(True)
+                        self.ui.ddcutilsNotInstalled.setVisible(False)
 
+                    self.ui.ddcutilsNotInstalled.setText("Laptop Displays Not Supported")
+
+                    self.displayMaxes.append(0)
+                    self.displayValues.append(0)
+            """
             res = all(ele == "Invalid display" for ele in self.displays)
             if not res:
-                self.ui.directControlBox.setEnabled(True)
-                self.ui.ddcutilsNotInstalled.setVisible(False)
+                
             else:
-                self.ui.ddcutilsNotInstalled.setText(
-                    "Laptop Displays Not Supported")
+            """
 
 
         self.canCloseToTray = False
@@ -386,7 +390,7 @@ class MyApplication(QtWidgets.QMainWindow):
 
         if self.ui.directControlBox.isChecked():
 
-            self.directlySetMaxBrightness(self.ui.primary_combobox.currentIndex(),
+            self.directlySetBrightness(self.ui.primary_combobox.currentIndex(),
                                             self.ui.primary_brightness.value())
 
             self.displayValues[self.ui.primary_combobox.currentIndex()] = int(
@@ -455,7 +459,7 @@ class MyApplication(QtWidgets.QMainWindow):
 
         if self.ui.directControlBox.isChecked():
 
-            self.directlySetMaxBrightness(self.ui.secondary_combo.currentIndex(),
+            self.directlySetBrightness(self.ui.secondary_combo.currentIndex(),
                                             self.ui.secondary_brightness.value())
 
             self.displayValues[self.ui.secondary_combo.currentIndex()] = int(
