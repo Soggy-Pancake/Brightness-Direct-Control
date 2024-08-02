@@ -104,16 +104,28 @@ def extract_display_names():
 def match_ddc_order(monitorNames):
 
     detectedMonitors = subprocess.check_output(["ddcutil", "detect"]).decode().splitlines()
-
+            
     reorderedMonitors = []
+
+    #laptopMonitorNames = [['eDP-1', 'eDP-1'], ['HDMI-1', 'VG279']]
+
+    #laptopTestCase = ['Display 1', '   I2C bus:             /dev/i2c-1', '   EDID synopsis:', '      Mfg id:           AUS', '      Model:            VG279', '      Serial number:    Redacted', '      Manufacture year: 2020', '      EDID version:     1.3', '   VCP version:         2.2', '', 'Invalid display', '   I2C bus:             /dev/i2c-4', '   EDID synopsis:', '      Mfg id:           BOE', '      Model:            ', '      Serial number:    ', '      Manufacture year: 2015', '      EDID version:     1.4', '   DDC communication failed', '   This is an eDP laptop display. Laptop displays do not support DDC/CI.', '']
 
     for line in detectedMonitors:
         if "Model" in line:
             for monitor in monitorNames:
-                if monitor[1] in line:
+                modelName = line.split(":")[1].strip()
+                if modelName == '':
+                    if monitor[1].startswith('eDP'):
+                        reorderedMonitors.append(monitor)
+                        break
+
+                if monitor[1] in modelName:
                     reorderedMonitors.append(monitor)
                     break
 
+    if len(monitorNames) != len(reorderedMonitors):
+        print("ERROR IN MONITOR REORDERING please create an issue on the github with 'ddcutil detect' and xrandr --verbose outputs")
     return reorderedMonitors
 
 

@@ -49,7 +49,7 @@ class MyApplication(QtWidgets.QMainWindow):
 
     global parser
 
-    def verbose(self, verbosityLevel : int, message: str) -> None:
+    def verbose(self, verbosityLevel : int, message : str) -> None:
         if verbosityLevel >= verbosity:
             print(message)
 
@@ -119,6 +119,34 @@ class MyApplication(QtWidgets.QMainWindow):
         self.temperature = 'Default'
         self.no_of_connected_dev = 0
         self.__assign_displays()
+
+        #moved to directly after __assign_displays to prevent comboboxes having items added in the original order from xrandr
+        if self.ddcutil_Installed:
+            self.displays = CDisplay.match_ddc_order(self.displays)
+
+            self.verbose(2, str(self.displays) + " : reordered displays")
+
+            self.ui.ddcutilsNotInstalled.setVisible(False)
+        
+            for i in range(len(self.displays)):
+                if not self.displays[i][0].startswith("eDP"):
+                    self.ui.directControlBox.setEnabled(True)
+
+                    brightnessValue = str(subprocess.check_output(
+                        ["ddcutil", "getvcp", "10", "-d", str(i + 1)]), 'utf-8')
+
+                    self.displayMaxes.append(int(
+                        brightnessValue.split(",")[1].split("=")[1].strip()))
+
+                    self.displayValues.append(int(
+                        brightnessValue.split(',')[0].split('=')[1].strip()))
+                else:
+                    self.ui.ddcutilsNotInstalled.setVisible(True)
+                    self.ui.ddcutilsNotInstalled.setText("Laptop Displays Not Supported")
+
+                    self.displayMaxes.append(0)
+                    self.displayValues.append(0)
+
         self.setup_default_directory()
         self.generate_dynamic_items()
         self.default_config = '/home/{}/.config/' \
@@ -136,28 +164,7 @@ class MyApplication(QtWidgets.QMainWindow):
             self.load_settings(self.default_config)
 
 
-        if self.ddcutil_Installed:
-            self.displays = CDisplay.match_ddc_order(self.displays)
         
-            for i in range(len(self.displays)):
-                if not self.displays[i][0].startswith("eDP"):
-                    brightnessValue = str(subprocess.check_output(
-                        ["ddcutil", "getvcp", "10", "-d", str(i + 1)]), 'utf-8')
-
-                    self.displayMaxes.append(int(
-                        brightnessValue.split(",")[1].split("=")[1].strip()))
-
-                    self.displayValues.append(int(
-                        brightnessValue.split(',')[0].split('=')[1].strip()))
-                else:
-                    if not len(self.displays) > 1:
-                        self.ui.directControlBox.setEnabled(True)
-                        self.ui.ddcutilsNotInstalled.setVisible(False)
-
-                    self.ui.ddcutilsNotInstalled.setText("Laptop Displays Not Supported")
-
-                    self.displayMaxes.append(0)
-                    self.displayValues.append(0)
             """
             res = all(ele == "Invalid display" for ele in self.displays)
             if not res:
@@ -333,19 +340,31 @@ class MyApplication(QtWidgets.QMainWindow):
 
         if self.ui.directControlBox.isChecked():
             self.ui.primary_brightness.setMaximum(100)
-            self.ui.primary_brightness.setValue(int(round(
-                (self.displayValues[0] / self.displayMaxes[0]) * 100)))
-            self.ui.primary_brightness.setFocusPolicy(Qt.NoFocus)
-            self.ui.primary_brightness.setTracking(False)
+
+            primaryComboIndex = self.ui.primary_combobox.currentIndex()
+            secondaryComboIndex = self.ui.secondary_combo.currentIndex()
+
+            # if display has valid max value, set the brightness slider's max value to display max
+            # otherwise we disable the slider since it either errored or is a laptop display and cant be controlled
+            if self.displayMaxes[primaryComboIndex] > 0:
+                self.ui.primary_brightness.setEnabled(True)
+                self.ui.primary_brightness.setValue(int(round(
+                    (self.displayValues[primaryComboIndex] / self.displayMaxes[primaryComboIndex]) * 100)))
+
+                self.ui.primary_brightness.setFocusPolicy(Qt.NoFocus)
+                self.ui.primary_brightness.setTracking(False)
+            else:
+                self.ui.primary_brightness.setEnabled(False)
 
             if self.no_of_displays > 1:
-                self.ui.secondary_brightness.setMaximum(100)
-                self.ui.secondary_brightness.setValue(int(round(
-                    (self.displayValues[1] / self.displayMaxes[1]) * 100)))
-                self.ui.secondary_brightness.setFocusPolicy(Qt.NoFocus)
-                self.ui.secondary_brightness.setTracking(False)
-
-                if self.ui.secondary_combo.currentText() == "Invalid display":
+                if self.displayMaxes[secondaryComboIndex] > 0:
+                    self.ui.secondary_brightness.setEnabled(True)
+                    self.ui.secondary_brightness.setMaximum(100)
+                    self.ui.secondary_brightness.setValue(int(round(
+                        (self.displayValues[secondaryComboIndex] / self.displayMaxes[secondaryComboIndex]) * 100)))
+                    self.ui.secondary_brightness.setFocusPolicy(Qt.NoFocus)
+                    self.ui.secondary_brightness.setTracking(False)
+                else:
                     self.ui.secondary_brightness.setEnabled(False)
 
         else:
@@ -537,21 +556,17 @@ class MyApplication(QtWidgets.QMainWindow):
         """
         self.display2 = self.displays[
             self.ui.secondary_combo.currentIndex()][0]  # text
-        print(self.ui.secondary_combo.currentText())
+            
         if self.ui.directControlBox.isChecked():
-            if self.ui.secondary_combo.currentText() == "Invalid display":
-                self.ui.secondary_brightness.setEnabled(False)
-                print("secondary disabled")
-            else:
-                self.ui.secondary_brightness.setEnabled(True)
-                print("secondary enabled")
-        else:
-            self.ui.secondary_brightness.setEnabled(True)
+            self.directControlUpdate(0)
 
     def primary_source_combo_activated(self, text):
         """assigns combo value to display"""
         self.display1 = self.displays[
             self.ui.primary_combobox.currentIndex()][0]  # text
+
+        if self.ui.directControlBox.isChecked():
+            self.directControlUpdate(0)
 
     def combo_activated(self, text):
         """ Designates values to display and to sliders """
