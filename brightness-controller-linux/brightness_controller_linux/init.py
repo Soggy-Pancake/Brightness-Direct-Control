@@ -369,7 +369,7 @@ class MyApplication(QtWidgets.QMainWindow):
 
         else:
             self.ui.primary_brightness.setEnabled(True)
-            self.ui.primary_brightness.setEnabled(True)
+            self.ui.secondary_brightness.setEnabled(True)
             self.ui.primary_brightness.setMaximum(99)
             self.ui.secondary_brightness.setMaximum(99)
             self.ui.primary_brightness.setValue(99)
