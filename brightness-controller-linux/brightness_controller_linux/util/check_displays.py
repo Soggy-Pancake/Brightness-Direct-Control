@@ -37,7 +37,7 @@ def extract_displays(output):
     return connected_displays
 
 
-def extract_monitor_name(edid_hex):
+def extract_edid_name(edid_hex):
     try:
         display_name = edid_hex[edid_hex.find('fc00') + 4:]
         display_name = display_name[:display_name.find('0a')]
@@ -47,6 +47,95 @@ def extract_monitor_name(edid_hex):
     except Exception as e:
         print("Error:", e)
         return None
+
+def x11_Monitor_Name_Extractor(xrandr_monitors : list):
+
+    displays = []
+
+    for monitor in xrandr_monitors:
+        monitorInfo = []
+        gettingEDID = False
+        currentEdid = ""
+        for line in monitor:
+
+            if "connected" in line:
+                monitorInfo.append(line[:line.find(' ')])
+
+            if gettingEDID and line.startswith("\t\t"):
+                currentEdid += line[2:]
+            elif gettingEDID:
+                break
+            else:
+                gettingEDID = False
+
+            if line == "\tEDID: ":
+                gettingEDID = True
+
+        
+        monitorName = extract_edid_name(currentEdid)
+        if monitorName:
+            monitorInfo.append(monitorName)
+        else:
+            print(f"Failed to get display name from monitor {monitor[0]}")
+            monitorInfo.append(monitorInfo[0])
+
+        displays.append(monitorInfo)
+
+    return displays
+
+def wayland_Monitor_Info_Extractor(monitorInfo):
+
+    connectionName = None
+    modelName = None
+
+    for line in monitorInfo:
+        #print(line)
+
+        if line.startswith('\tname:'):
+            connectionName = line.split(':')[1].strip()
+
+        if line.startswith("\tmake:"):
+            model = line.split(',')[1]
+            modelName = model[ model.find("'") + 1 : model.rfind("/") ]
+            #print(modelName)
+
+    if modelName and connectionName:
+        return [connectionName, modelName]
+    else:
+        return None
+
+
+def wayland_Monitor_Name_Extractor():
+
+    waylandInfo = []
+    displays = []
+    currentDisplay = []
+
+    try:
+        waylandInfo = subprocess.check_output(["wayland-info"]).decode().splitlines()
+        print("test")
+    except:
+        print("ERROR: Please install the package \"wayland-utils\" for the wayland-info command!")
+        print("Monitor names will not be shown as they can't be labeled")
+        return None
+
+    i = -1
+    for line in waylandInfo:
+        #print(line)
+        i += 1
+
+        if line.startswith("interface: 'wl_output',") or i == len(waylandInfo) - 1:
+            if currentDisplay[0].startswith("interface: 'wl_output',"):
+                #get display info out
+                monitorInfo = wayland_Monitor_Info_Extractor(currentDisplay)
+                if not monitorInfo[0].startswith("Unknown"):
+                    displays.append(monitorInfo)
+            #print(currentDisplay)
+            currentDisplay = []
+        
+        currentDisplay.append(line)
+        
+    return displays
 
 
 def extract_display_names():
@@ -82,41 +171,21 @@ def extract_display_names():
         else:
             display.append(line)
 
-        
-
     displays = []
 
     if os.getenv("XDG_SESSION_TYPE") == "wayland":
         print("WAYLAND SESSION!")
+        waylandDisplayNames = wayland_Monitor_Name_Extractor()
+        if waylandDisplayNames == None:
+            # fall back to old nameing
+            print("ERROR Falling back to x11 monitor name extractor! Names may not be extracted!")
+            return x11_Monitor_Name_Extractor(displayVerboseInfo)
 
-    for monitor in displayVerboseInfo:
-        monitorInfo = []
-        gettingEDID = False
-        currentEdid = ""
-        for line in monitor:
+        # we got display names from wayland!
+        return waylandDisplayNames
 
-            if "connected" in line:
-                monitorInfo.append(line[:line.find(' ')])
-
-            if gettingEDID and line.startswith("\t\t"):
-                currentEdid += line[2:]
-            elif gettingEDID:
-                break
-            else:
-                gettingEDID = False
-
-            if line == "\tEDID: ":
-                gettingEDID = True
-
-        
-        monitorName = extract_monitor_name(currentEdid)
-        if monitorName:
-            monitorInfo.append(extract_monitor_name(currentEdid))
-        else:
-            print(f"Failed to get display name from monitor {monitor[0]}")
-            monitorInfo.append(monitorInfo[0])
-
-        displays.append(monitorInfo)
+    else:
+        return x11_Monitor_Name_Extractor(displayVerboseInfo)
 
     return displays
             
