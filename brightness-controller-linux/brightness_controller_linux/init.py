@@ -88,8 +88,7 @@ class MyApplication(QtWidgets.QMainWindow):
                 if "sudo modprobe" in str(
                         subprocess.check_output(["ddcutil", "environment"]),
                         'utf-8'):
-                    self.ui.ddcutilsNotInstalled.setText(
-                        "add i2c-dev to etc/modules-load.d")
+                    self.ui.ddcutilsNotInstalled.setText("add i2c-dev to etc/modules-load.d")
                 else:
                     self.ddcutil_Installed = True
         except:

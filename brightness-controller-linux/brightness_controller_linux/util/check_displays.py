@@ -16,7 +16,7 @@
 # You should have received a copy of the GNU General Public License
 # along with Brightness Controller.  If not, see <http://www.gnu.org/licenses/>.
 
-import subprocess
+import subprocess, os
 import shlex
 import re
 
@@ -56,19 +56,39 @@ def extract_display_names():
     display = []
 
     #get verbose data for displays
+    i = -1
     for line in xrandr_output:
+        i += 1
 
         if line.startswith("Screen"): continue
 
+        if line.startswith("DP"): 
+            print("WE FOUND ONE")
+
+        if i == len(xrandr_output) - 1:
+            display.append(line)
+            if "disconnected" not in display[0]: 
+                if not display[0].startswith("Unknown"):
+                        displayVerboseInfo.append(display)
+
         if not line.startswith("\t") and "connected" in line:
             if len(display) > 0: 
-                if "disconnected" not in display[0]: displayVerboseInfo.append(display)
+                if "disconnected" not in display[0]: 
+                    if not display[0].startswith("Unknown"):
+                        displayVerboseInfo.append(display)
+
             display = []
             display.append(line)
         else:
             display.append(line)
-    
+
+        
+
     displays = []
+
+    if os.getenv("XDG_SESSION_TYPE") == "wayland":
+        print("WAYLAND SESSION!")
+
     for monitor in displayVerboseInfo:
         monitorInfo = []
         gettingEDID = False
@@ -126,6 +146,7 @@ def match_ddc_order(monitorNames):
 
     if len(monitorNames) != len(reorderedMonitors):
         print("ERROR IN MONITOR REORDERING please create an issue on the github with 'ddcutil detect' and xrandr --verbose outputs")
+        return monitorNames # fall back to unreordered output
     return reorderedMonitors
 
 
