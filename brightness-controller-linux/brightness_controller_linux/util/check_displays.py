@@ -113,7 +113,6 @@ def wayland_Monitor_Name_Extractor():
 
     try:
         waylandInfo = subprocess.check_output(["wayland-info"]).decode().splitlines()
-        print("test")
     except:
         print("ERROR: Please install the package \"wayland-utils\" for the wayland-info command!")
         print("Monitor names will not be shown as they can't be labeled")

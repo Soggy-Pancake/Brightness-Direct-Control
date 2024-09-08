@@ -19,20 +19,20 @@
 
 import sys
 import getpass, argparse
-from os import path, remove, makedirs
+from os import path, remove, makedirs, getenv
 from qtpy import QtGui, QtCore, QtWidgets
 from qtpy.QtCore import QSize, Qt
 from qtpy.QtGui import QIcon
-from util.QtSingleApplication import QtSingleApplication
-from ui.mainwindow import Ui_MainWindow
-from ui.license import Ui_Form as License_Ui_Form
-from ui.about import Ui_Form as About_Ui_Form
-from ui.help import Ui_Form as Help_Ui_Form
-from util import executor as Executor
-from util import check_displays as CDisplay
-from util import write_config as WriteConfig
-from util import read_config as ReadConfig
-from util import resource_provider as rp
+from brightness_controller_linux.util.QtSingleApplication import QtSingleApplication
+from brightness_controller_linux.ui.mainwindow import Ui_MainWindow
+from brightness_controller_linux.ui.license import Ui_Form as License_Ui_Form
+from brightness_controller_linux.ui.about import Ui_Form as About_Ui_Form
+from brightness_controller_linux.ui.help import Ui_Form as Help_Ui_Form
+from brightness_controller_linux.util import executor as Executor
+from brightness_controller_linux.util import check_displays as CDisplay
+from brightness_controller_linux.util import write_config as WriteConfig
+from brightness_controller_linux.util import read_config as ReadConfig
+from brightness_controller_linux.util import resource_provider as rp
 # import util.filepath_handler as Filepath_handler
 import subprocess
 import threading
@@ -50,7 +50,7 @@ class MyApplication(QtWidgets.QMainWindow):
     global parser
 
     def verbose(self, verbosityLevel : int, message : str) -> None:
-        if verbosityLevel >= verbosity:
+        if verbosity>= verbosityLevel:
             print(message)
 
     def __assign_displays(self):
@@ -80,8 +80,11 @@ class MyApplication(QtWidgets.QMainWindow):
         """Initializes"""
         QtWidgets.QMainWindow.__init__(self, parent)
 
+        # warn if wayland is installed
+        if os.getenv("XDG_SESSION_TYPE") == "wayland":
+            print("Warning: Wayland session detected! Wayland is in experimental support! Expect buggy behavior")
+
         # check if ddcutil is installed
-        
         try:
             if "ddcutil" in str(
                     subprocess.check_output(["ddcutil", "--version"]), 'utf-8'):
@@ -899,7 +902,6 @@ parser.add_argument('-v', '--verbose', action='store_const', const=2, default=1)
 
 args = parser.parse_args()
 verbosity = args.verbose
-
 
 def main():
     UUID = 'PHIR-HWOH-MEIZ-AHTA'
