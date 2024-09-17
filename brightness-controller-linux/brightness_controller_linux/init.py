@@ -18,7 +18,7 @@
 # <http://www.gnu.org/licenses/>.
 
 import sys
-import getpass, argparse
+import getpass, argparse, os
 from os import path, remove, makedirs, getenv
 from qtpy import QtGui, QtCore, QtWidgets
 from qtpy.QtCore import QSize, Qt
