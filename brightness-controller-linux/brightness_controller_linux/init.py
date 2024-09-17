@@ -42,6 +42,7 @@ verbosity = 1
 
 class MyApplication(QtWidgets.QMainWindow):
     ddcutil_Installed = False
+    waylandEnvironment = False
 
     displayMaxes = []
     displayValues = []
@@ -67,14 +68,17 @@ class MyApplication(QtWidgets.QMainWindow):
             self.display1 = self.displays[0][0]
             self.display2 = self.displays[1][0]
 
-    def directlySetBrightness(self, displayNum, percentage):
-        self.verbose(2, f"Updating brightness for display {self.displays[displayNum][1]}")
+    def directlySetBrightness(self, displayNum, value):
+        self.verbose(2, f"Updating brightness for display {self.displays[displayNum][1]} with value {value}")
 
-        percentage = round(percentage) / 100
+        if self.displays[displayNum][0].startswith("eDP"):
+            print("ATTEMPTED TO SET LAPTOP DISPLAY: ABORTING")
+            return
 
-        subprocess.run(["ddcutil", "setvcp", "10", str(int(
-            self.displayMaxes[displayNum] * percentage)), "-d",
-                        str(displayNum + 1)])
+        try:
+            subprocess.run(["ddcutil", "setvcp", "10", str(int(value)), "-d", str(displayNum + 1)])
+        except:
+            print(f"Error while setting display {self.displays[displayNum][1]} with value {value}")
 
     def __init__(self, parent=None):
         """Initializes"""
@@ -83,6 +87,8 @@ class MyApplication(QtWidgets.QMainWindow):
         # warn if wayland is installed
         if os.getenv("XDG_SESSION_TYPE") == "wayland":
             print("Warning: Wayland session detected! Wayland is in experimental support! Expect buggy behavior")
+            waylandEnvironment = True
+            QtWidgets.QMessageBox.warning(self, "Wayland Environment", "Wayland is in EXPERIMENTAL support. Software brightness is currently broken.")
 
         # check if ddcutil is installed
         try:
@@ -96,6 +102,15 @@ class MyApplication(QtWidgets.QMainWindow):
                     self.ddcutil_Installed = True
         except:
             self.ddcutil_Installed = False 
+
+        if (not self.ddcutil_Installed) and waylandEnvironment:
+            # Just exit entirely if we are on wayland and dont have ddcutil since it just won't do anything
+            errorBox = QtWidgets.QMessageBox.critical(None, 
+                                                    "DDCUtil Missing",
+                                                    "Software brightness is broken on wayland and ddcutil doesn't appear to be installed! Please install the package `ddcutil` to use this program on wayland.",
+                                                    QtWidgets.QMessageBox.StandardButton.Close)
+            sys.exit()
+            
 
         
         self.updatingMode = False
@@ -349,9 +364,14 @@ class MyApplication(QtWidgets.QMainWindow):
             # if display has valid max value, set the brightness slider's max value to display max
             # otherwise we disable the slider since it either errored or is a laptop display and cant be controlled
             if self.displayMaxes[primaryComboIndex] > 0:
-                self.ui.primary_brightness.setEnabled(True)
-                self.ui.primary_brightness.setValue(int(round(
-                    (self.displayValues[primaryComboIndex] / self.displayMaxes[primaryComboIndex]) * 100)))
+
+                if not self.displays[primaryComboIndex][0].startswith("eDP"):
+                    self.ui.primary_brightness.setEnabled(True)
+                    self.ui.primary_brightness.setMaximum(self.displayMaxes[primaryComboIndex])
+                    self.ui.primary_brightness.setValue(int(round(
+                        (self.displayValues[primaryComboIndex] / self.displayMaxes[primaryComboIndex]) * 100)))
+                else:
+                    self.ui.primary_brightness.setEnabled(False)
 
                 self.ui.primary_brightness.setFocusPolicy(Qt.NoFocus)
                 self.ui.primary_brightness.setTracking(False)
@@ -360,10 +380,14 @@ class MyApplication(QtWidgets.QMainWindow):
 
             if self.no_of_displays > 1:
                 if self.displayMaxes[secondaryComboIndex] > 0:
-                    self.ui.secondary_brightness.setEnabled(True)
-                    self.ui.secondary_brightness.setMaximum(100)
-                    self.ui.secondary_brightness.setValue(int(round(
-                        (self.displayValues[secondaryComboIndex] / self.displayMaxes[secondaryComboIndex]) * 100)))
+                    if not self.displays[secondaryComboIndex][0].startswith("eDP"):
+                        self.ui.secondary_brightness.setEnabled(True)
+                        self.ui.secondary_brightness.setMaximum(self.displayMaxes[secondaryComboIndex])
+                        self.ui.secondary_brightness.setValue(int(round(
+                            (self.displayValues[secondaryComboIndex] / self.displayMaxes[secondaryComboIndex]) * 100)))
+                    else:
+                        self.ui.secondary_brightness.setEnabled(False)
+
                     self.ui.secondary_brightness.setFocusPolicy(Qt.NoFocus)
                     self.ui.secondary_brightness.setTracking(False)
                 else:
@@ -561,6 +585,12 @@ class MyApplication(QtWidgets.QMainWindow):
         self.display2 = self.displays[
             self.ui.secondary_combo.currentIndex()][0]  # text
 
+        if self.ddcutil_Installed and self.displays[self.ui.secondary_combo.currentIndex()][0].startswith("eDP"):
+            self.ui.primary_brightness.setEnabled(False)
+        else:
+            self.ui.primary_brightness.setEnabled(True)
+
+
         if self.ui.directControlBox.isChecked():
             self.directControlUpdate(0)
 
@@ -568,6 +598,12 @@ class MyApplication(QtWidgets.QMainWindow):
         """assigns combo value to display"""
         self.display1 = self.displays[
             self.ui.primary_combobox.currentIndex()][0]  # text
+
+        # Disable slider if laptop display
+        if self.ddcutil_Installed and self.displays[self.ui.primary_combobox.currentIndex()][0].startswith("eDP"):
+            self.ui.primary_brightness.setEnabled(False)
+        else:
+            self.ui.primary_brightness.setEnabled(True)
 
         if self.ui.directControlBox.isChecked():
             self.directControlUpdate(0)

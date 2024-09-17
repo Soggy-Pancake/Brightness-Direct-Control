@@ -150,9 +150,6 @@ def extract_display_names():
 
         if line.startswith("Screen"): continue
 
-        if line.startswith("DP"): 
-            print("WE FOUND ONE")
-
         if i == len(xrandr_output) - 1:
             display.append(line)
             if "disconnected" not in display[0]: 
