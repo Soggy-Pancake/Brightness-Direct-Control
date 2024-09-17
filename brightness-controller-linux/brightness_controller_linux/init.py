@@ -87,7 +87,7 @@ class MyApplication(QtWidgets.QMainWindow):
         # warn if wayland is installed
         if os.getenv("XDG_SESSION_TYPE") == "wayland":
             print("Warning: Wayland session detected! Wayland is in experimental support! Expect buggy behavior")
-            waylandEnvironment = True
+            self.waylandEnvironment = True
             QtWidgets.QMessageBox.warning(self, "Wayland Environment", "Wayland is in EXPERIMENTAL support. Software brightness is currently broken.")
 
         # check if ddcutil is installed
@@ -103,7 +103,7 @@ class MyApplication(QtWidgets.QMainWindow):
         except:
             self.ddcutil_Installed = False 
 
-        if (not self.ddcutil_Installed) and waylandEnvironment:
+        if (not self.ddcutil_Installed) and self.waylandEnvironment:
             # Just exit entirely if we are on wayland and dont have ddcutil since it just won't do anything
             errorBox = QtWidgets.QMessageBox.critical(None, 
                                                     "DDCUtil Missing",
@@ -177,11 +177,13 @@ class MyApplication(QtWidgets.QMainWindow):
         self.connect_handlers()
         self.setup_widgets()
 
+        if self.ddcutil_Installed and self.waylandEnvironment:
+            self.ui.directControlBox.setChecked(True) # Auto turn on ddc control since xrandr doesnt work on wayland
+            self.ui.directControlBox.setEnabled(False)
+
         if path.exists(self.default_config):
             self.load_settings(self.default_config)
 
-
-        
             """
             res = all(ele == "Invalid display" for ele in self.displays)
             if not res:
@@ -353,6 +355,10 @@ class MyApplication(QtWidgets.QMainWindow):
         self.ui.actionLoad.triggered.connect(self.load_settings)
 
     def directControlUpdate(self, value):
+
+        if self.ddcutil_Installed and self.waylandEnvironment and not self.ui.directControlBox.isChecked():
+            self.ui.directControlBox.setChecked(True) # Force wayland users to only use ddc
+
         self.updatingMode = True
 
         if self.ui.directControlBox.isChecked():
