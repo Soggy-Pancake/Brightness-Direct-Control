@@ -20,9 +20,14 @@
 import sys
 import getpass, argparse, os
 from os import path, remove, makedirs, getenv
-from qtpy import QtGui, QtCore, QtWidgets
-from qtpy.QtCore import QSize, Qt
-from qtpy.QtGui import QIcon
+try:
+    from qtpy import QtGui, QtCore, QtWidgets
+    from qtpy.QtCore import QSize, Qt
+    from qtpy.QtGui import QIcon
+except:
+    from PyQt5 import QtGui, QtCore, QtWidgets
+    from PyQt5.QtCore import QSize, Qt
+    from PyQt5.QtGui import QIcon
 from brightness_controller_linux.util.QtSingleApplication import QtSingleApplication
 from brightness_controller_linux.ui.mainwindow import Ui_MainWindow
 from brightness_controller_linux.ui.license import Ui_Form as License_Ui_Form
