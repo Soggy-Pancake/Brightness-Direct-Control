@@ -20,6 +20,13 @@ import subprocess, os
 import shlex
 import re
 
+debug = False
+try:
+    import brightness_controller_linux.util.log as log
+except:
+    import log  #used in testing
+    debug = True
+
 def query_xrandr():
     query = "xrandr --query"
     xrandr_output = subprocess.Popen(shlex.split(query), stdout=subprocess.PIPE,
@@ -75,11 +82,15 @@ def x11_Monitor_Name_Extractor(xrandr_monitors : list):
         monitorName = extract_edid_name(currentEdid)
         if monitorName:
             monitorInfo.append(monitorName)
+            log.info(f"{monitor[0]} name is {monitorName}")
         else:
             print(f"Failed to get display name from monitor {monitor[0]}")
+            log.info(f"Failed to get display name from monitor {monitor[0]}")
             monitorInfo.append(monitorInfo[0])
 
         displays.append(monitorInfo)
+
+    log.info(f"[x11] Monitor names extracted: [{displays}]")
 
     return displays
 
@@ -120,7 +131,6 @@ def wayland_Monitor_Name_Extractor():
 
     i = -1
     for line in waylandInfo:
-        #print(line)
         i += 1
 
         if line.startswith("interface: 'wl_output',") or i == len(waylandInfo) - 1:
@@ -133,11 +143,13 @@ def wayland_Monitor_Name_Extractor():
             currentDisplay = []
         
         currentDisplay.append(line)
+
+    log.info(f"[wayland] Monitor names extracted: {displays}")
         
     return displays
 
 
-def extract_display_names():
+def extract_display_names(testInfo = None):
     xrandr_output = subprocess.check_output(["xrandr", "--verbose"]).decode().splitlines()
 
     displayVerboseInfo = []
@@ -167,13 +179,15 @@ def extract_display_names():
         else:
             display.append(line)
 
-    displays = []
+    log.info(f"Display info : {len(displayVerboseInfo)} displays.")
+    log.info(displayVerboseInfo)
+    log.info("")
 
     if os.getenv("XDG_SESSION_TYPE") == "wayland":
-        print("WAYLAND SESSION!")
         waylandDisplayNames = wayland_Monitor_Name_Extractor()
         if waylandDisplayNames == None:
             # fall back to old nameing
+            log.warning("Fell back to x11 monitor name extraction!")
             print("ERROR Falling back to x11 monitor name extractor! Names may not be extracted!")
             return x11_Monitor_Name_Extractor(displayVerboseInfo)
 
@@ -182,13 +196,14 @@ def extract_display_names():
 
     else:
         return x11_Monitor_Name_Extractor(displayVerboseInfo)
-
-    return displays
             
             
 def match_ddc_order(monitorNames):
-
+    
     detectedMonitors = subprocess.check_output(["ddcutil", "detect"]).decode().splitlines()
+
+    log.info("ddcutil detect output:")
+    log.info(detectedMonitors)
             
     reorderedMonitors = []
 
@@ -200,17 +215,21 @@ def match_ddc_order(monitorNames):
         if "Model" in line:
             for monitor in monitorNames:
                 modelName = line.split(":")[1].strip()
+                log.info(f"[ddcReorder] Model name output {modelName}")
                 if modelName == '':
                     if monitor[1].startswith('eDP'):
                         reorderedMonitors.append(monitor)
+                        log.info(f"[ddcReorder] added {monitor} from {modelName}")
                         break
 
                 if monitor[1] in modelName:
                     reorderedMonitors.append(monitor)
+                    log.info(f"[ddcReorder] added {monitor} from {modelName}")
                     break
 
     if len(monitorNames) != len(reorderedMonitors):
-        print("ERROR IN MONITOR REORDERING please create an issue on the github with 'ddcutil detect' and xrandr --verbose outputs")
+        print(f"ERROR IN MONITOR REORDERING please create an issue on the github with your log file at ~/.config/brightness_controller/log.txt")
+        log.error(f"Failed attempting to reorder monitors, input: {monitorNames}  attempted output: {reorderedMonitors}")
         return monitorNames # fall back to unreordered output
     return reorderedMonitors
 
@@ -224,6 +243,9 @@ def detect_display_devices():
     return extract_displays(query_xrandr())
 
 
-if __name__ == '__main__':
+if debug:
     #print(detect_display_devices())
-    print(len(extract_display_names()))
+    with open("test.txt", 'r') as file:
+        testInfo = file.readlines()
+
+        extract_display_names(testInfo)

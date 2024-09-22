@@ -18,7 +18,7 @@
 # <http://www.gnu.org/licenses/>.
 
 import sys
-import getpass, argparse, os
+import getpass, argparse, os, traceback
 from os import path, remove, makedirs, getenv
 from qtpy import QtGui, QtCore, QtWidgets
 from qtpy.QtCore import QSize, Qt
@@ -33,6 +33,8 @@ from brightness_controller_linux.util import check_displays as CDisplay
 from brightness_controller_linux.util import write_config as WriteConfig
 from brightness_controller_linux.util import read_config as ReadConfig
 from brightness_controller_linux.util import resource_provider as rp
+
+import brightness_controller_linux.util.log as log
 # import util.filepath_handler as Filepath_handler
 import subprocess
 import threading
@@ -60,6 +62,10 @@ class MyApplication(QtWidgets.QMainWindow):
         self.no_of_displays = len(self.displays)
         self.no_of_connected_dev = self.no_of_displays
 
+        log.info(f"{self.no_of_displays} detected displays:")
+        log.info(str(self.displays))
+        log.info("")
+
         self.verbose(2, str(self.displays) + "   " + str(self.no_of_displays))
 
         if self.no_of_displays == 1:
@@ -70,6 +76,7 @@ class MyApplication(QtWidgets.QMainWindow):
 
     def directlySetBrightness(self, displayNum, value):
         self.verbose(2, f"Updating brightness for display {self.displays[displayNum][1]} with value {value}")
+        log.info(f"Updating brightness for display {displayNum} {self.displays[displayNum][1]} with value {value}")
 
         if self.displays[displayNum][0].startswith("eDP"):
             print("ATTEMPTED TO SET LAPTOP DISPLAY: ABORTING")
@@ -79,15 +86,20 @@ class MyApplication(QtWidgets.QMainWindow):
             subprocess.run(["ddcutil", "setvcp", "10", str(int(value)), "-d", str(displayNum + 1)])
         except:
             print(f"Error while setting display {self.displays[displayNum][1]} with value {value}")
+            log.error(f"Error while setting display {displayNum} {self.displays[displayNum][1]} with value {value}")
+
 
     def __init__(self, parent=None):
         """Initializes"""
         QtWidgets.QMainWindow.__init__(self, parent)
 
+        log.begin()
+
         # warn if wayland is installed
         if os.getenv("XDG_SESSION_TYPE") == "wayland":
             print("Warning: Wayland session detected! Wayland is in experimental support! Expect buggy behavior")
             self.waylandEnvironment = True
+            log.warning("Wayland session detected!")
             QtWidgets.QMessageBox.warning(self, "Wayland Environment", "Wayland is in EXPERIMENTAL support. Software brightness is currently broken.")
 
         # check if ddcutil is installed
@@ -103,8 +115,11 @@ class MyApplication(QtWidgets.QMainWindow):
         except:
             self.ddcutil_Installed = False 
 
+        log.info(f"DDCUtils installed: {self.ddcutil_Installed}")
+
         if (not self.ddcutil_Installed) and self.waylandEnvironment:
             # Just exit entirely if we are on wayland and dont have ddcutil since it just won't do anything
+            log.fatal("Wayland environment detected and ddcutils is not installed! Exiting")
             errorBox = QtWidgets.QMessageBox.critical(None, 
                                                     "DDCUtil Missing",
                                                     "Software brightness is broken on wayland and ddcutil doesn't appear to be installed! Please install the package `ddcutil` to use this program on wayland.",
@@ -145,24 +160,33 @@ class MyApplication(QtWidgets.QMainWindow):
 
             self.ui.ddcutilsNotInstalled.setVisible(False)
         
+            log.info("Getting display brightness ranges.")
+
             for i in range(len(self.displays)):
-                if not self.displays[i][0].startswith("eDP"):
-                    self.ui.directControlBox.setEnabled(True)
+                self.ui.directControlBox.setEnabled(True)
 
-                    brightnessValue = str(subprocess.check_output(
-                        ["ddcutil", "getvcp", "10", "-d", str(i + 1)]), 'utf-8')
+                brightnessValue = ""
 
-                    self.displayMaxes.append(int(
-                        brightnessValue.split(",")[1].split("=")[1].strip()))
-
-                    self.displayValues.append(int(
-                        brightnessValue.split(',')[0].split('=')[1].strip()))
-                else:
+                brightnessValue = subprocess.getoutput(f"ddcutil getvcp 10 -d {i + 1}") # Ignores the return value
+                log.info(brightnessValue)
+                if "Display not found" in brightnessValue:
+                    log.error(f"Display wasn't found for command `ddcutil getvcp 10 -d {i + 1}`")
                     self.ui.ddcutilsNotInstalled.setVisible(True)
                     self.ui.ddcutilsNotInstalled.setText("Laptop Displays Not Supported")
+                    self.displayMaxes.append(1)
+                    self.displayValues.append(1)
+                    continue
 
-                    self.displayMaxes.append(0)
-                    self.displayValues.append(0)
+                self.displayMaxes.append(int(
+                    brightnessValue.split(",")[1].split("=")[1].strip()))
+
+                self.displayValues.append(int(
+                    brightnessValue.split(',')[0].split('=')[1].strip()))
+
+            log.info(f"current display values {self.displayValues}") 
+            log.info(f"display maxes: {self.displayMaxes}")
+
+                    
 
         self.setup_default_directory()
         self.generate_dynamic_items()
@@ -198,6 +222,8 @@ class MyApplication(QtWidgets.QMainWindow):
             self.canCloseToTray = True
             self.setup_tray(parent)
 
+        log.info("Init finished!")
+
     def setup_default_directory(self):
         """ Create default settings directory if it doesnt exist """
         directory = '/home/{}/.config/' \
@@ -219,6 +245,7 @@ class MyApplication(QtWidgets.QMainWindow):
                                                    QtWidgets.QMessageBox.No)
             if reply == QtWidgets.QMessageBox.Yes:
                 event.accept()
+                log.info("Application Exiting!")
                 sys.exit(self.APP.exec_())
             else:
                 event.ignore()
@@ -236,6 +263,7 @@ class MyApplication(QtWidgets.QMainWindow):
                                                QtWidgets.QMessageBox.No,
                                                QtWidgets.QMessageBox.No)
         if reply == QtWidgets.QMessageBox.Yes:
+            log.info("Application Exiting!")
             sys.exit(self.APP.exec_())
 
     def setup_tray(self, parent):
@@ -358,6 +386,8 @@ class MyApplication(QtWidgets.QMainWindow):
 
         if self.ddcutil_Installed and self.waylandEnvironment and not self.ui.directControlBox.isChecked():
             self.ui.directControlBox.setChecked(True) # Force wayland users to only use ddc
+
+        log.info(f"ddc mode toggled to: {self.ui.directControlBox.isChecked()}")
 
         self.updatingMode = True
 
@@ -957,4 +987,7 @@ def main():
     sys.exit(APP.exec_())
 
 if __name__ == "__main__":
-    main()
+    try:
+        main()
+    except:
+        log.fatal(traceback.format_exc())
