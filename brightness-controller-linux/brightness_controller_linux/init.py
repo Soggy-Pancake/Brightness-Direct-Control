@@ -112,7 +112,7 @@ class MyApplication(QtWidgets.QMainWindow):
                     self.ui.ddcutilsNotInstalled.setText("add i2c-dev to etc/modules-load.d")
                 else:
                     self.ddcutil_Installed = True
-        except:
+        except Exception:
             self.ddcutil_Installed = False 
 
         log.info(f"DDCUtils installed: {self.ddcutil_Installed}")
