@@ -110,9 +110,20 @@ class MyApplication(QtWidgets.QMainWindow):
                         subprocess.check_output(["ddcutil", "environment"]),
                         'utf-8'):
                     self.ui.ddcutilsNotInstalled.setText("add i2c-dev to etc/modules-load.d")
+
+                envCheck = str(subprocess.check_output(["ddcutil", "environment"]), 'utf-8')
+
+                if "not a member of group i2c" in envCheck:
+
+                    log.fatal(f"[DDCUtil] User is not part of i2c group! Run 'sudo usermod -G i2c -a {getpass.getuser()}'")
+                    errorBox = QtWidgets.QMessageBox.critical(None, 
+                                                    "DDCUtil User config error!",
+                                                    f"User is not part of i2c group! Run 'sudo usermod -G i2c -a {getpass.getuser()}'",
+                                                    QtWidgets.QMessageBox.StandardButton.Close)
+                    exit()
                 else:
                     self.ddcutil_Installed = True
-        except:
+        except Exception:
             self.ddcutil_Installed = False 
 
         log.info(f"DDCUtils installed: {self.ddcutil_Installed}")
